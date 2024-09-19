@@ -1,0 +1,17 @@
+[package]
+name = "scom"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "scom"
+path = "src/lib.rs"
+
+[[bin]]
+name = "scom"
+path = "bin/main.rs"
+
+[dependencies]
+clap = { version = "4.0", features = ["derive"] }
+serial2 = "0.2"
+#ncurses = "6.0"
