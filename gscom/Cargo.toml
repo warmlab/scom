@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-gdk4-sys = "0.9.0"
-#gtk = { version = "0.9.1", package = "gtk4", features = ["v4_12"] }
+glib = "0.20"
 gtk = { version = "0.9.1", package = "gtk4", features = ["v4_8"] }
+scom = { path="../scom" }

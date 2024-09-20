@@ -1,3 +1,7 @@
+mod config;
+
+pub use config::{Config, BitMode, BaudRate, DataFormat};
+
 use serial2::SerialPort;
 use std::io::{self, Read, Write};
 use std::time::Duration;
@@ -12,6 +16,19 @@ impl SerialConnection {
         port.set_read_timeout(Duration::from_secs(1))?;
         port.set_write_timeout(Duration::from_secs(1))?;
         Ok(SerialConnection { port })
+    }
+
+    pub fn write_lines(&mut self, lines: &Vec<String>) -> Result<usize, io::Error> {
+        let mut total: usize = 0;
+
+        for line in lines {
+            match self.write_data(&line.as_bytes()) { // into_bytes
+                Ok(c) => total += c,
+                Err(e) => return Err(e)
+            }
+        }
+
+        Ok(total)
     }
 
     pub fn write_data(&mut self, data: &[u8]) -> Result<usize, io::Error> {

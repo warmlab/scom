@@ -12,6 +12,8 @@ name = "scom"
 path = "bin/main.rs"
 
 [dependencies]
+toml = "0.5"
+serde = { version = "1.0", features = ["derive"] }
 clap = { version = "4.0", features = ["derive"] }
 serial2 = "0.2"
 #ncurses = "6.0"
