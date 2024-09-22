@@ -29,11 +29,11 @@ pub struct CommandLine {
     pub data: Option<String>,
 
     // specifies input data format, (ascii/utf8/hex)
-    #[arg(short='I', long)]
+    #[arg(short='I', long, value_enum, default_value_t=DataFormat::ASCII)]
     pub input_format: DataFormat,
 
     // specifies output data format, (ascii/utf8/hex)
-    #[arg(short='O', long)]
+    #[arg(short='O', long, value_enum, default_value_t=DataFormat::ASCII)]
     pub output_format: DataFormat,
 
     /// specifies the number of transmissions to send before stopping.
@@ -59,6 +59,6 @@ pub struct CommandLine {
     #[arg(short, long, action = clap::ArgAction::Count)]
     pub verbose: u8,
 
-    #[arg(short, long, value_enum)]
+    #[arg(short, long, value_enum, default_value_t=BitMode::bit8)]
     pub mode: BitMode
 }

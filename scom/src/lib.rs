@@ -1,10 +1,13 @@
 mod config;
+mod hexstring;
 
 pub use config::{Config, BitMode, BaudRate, DataFormat};
+pub use hexstring::HexString;
 
 use serial2::SerialPort;
 use std::io::{self, Read, Write};
 use std::time::Duration;
+
 
 pub struct SerialConnection {
     port: SerialPort,

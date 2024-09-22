@@ -1,6 +1,6 @@
 mod cli;
 
-use scom::SerialConnection;
+use scom::{DataFormat, SerialConnection};
 use std::io::{self, BufRead, BufReader, BufWriter, Read, Write};
 use std::time::{Duration, Instant};
 use std::fs::File;
@@ -8,6 +8,7 @@ use std::fs::File;
 use clap::Parser;
 
 use cli::CommandLine;
+use scom::HexString;
 
 
 fn main() -> Result<(), io::Error> {
@@ -63,10 +64,10 @@ fn main() -> Result<(), io::Error> {
             let mut input = String::new();
             io::stdin().read_line(&mut input)?;
             //input_lines.push(input);
-            handle_line(&mut connection, &input, &mut output);
+            handle_line(&mut connection, &input, &mut output, &cli.input_format, &cli.output_format);
         } else {
             for line in lines.iter() {
-                handle_line(&mut connection, &line, &mut output);
+                handle_line(&mut connection, &line, &mut output, &cli.input_format, &cli.output_format);
             }
         }
 
@@ -109,26 +110,55 @@ fn main() -> Result<(), io::Error> {
     Ok(())
 }
 
-fn handle_line(connection: &mut SerialConnection, line: &str, output: &mut Option<BufWriter<File>>) {
+fn handle_line(connection: &mut SerialConnection, line: &str, output: &mut Option<BufWriter<File>>, input_format: &DataFormat, output_format: &DataFormat) {
+    let hex;
+    let data_to_send;
     // send data
-    match connection.write_data(line.as_bytes()) {
+    if *input_format == DataFormat::HEX {
+        data_to_send = match String::from_hex(line) {
+            Ok(r) => {
+                hex = r;
+                hex.as_slice()
+            },
+            Err(err) => {
+                eprintln!("error in parse vector bytes to array: {}", err);
+                b""
+            }
+        };
+    } else {
+        data_to_send = line.as_bytes();
+    }
+
+    match connection.write_data(data_to_send) {
         Ok(bytes_write) => {
             println!("data[{}] has sent to the port", bytes_write);
         }
         Err(e) => eprintln!("error sending data to serial port: {:?}", e),
     }
 
-    // Receive data
+    // Buffer for receiving data from the serial connection
     let mut buffer = [0; 1024];
     match connection.read_data(&mut buffer) {
         Ok(bytes_read) => {
-            let response = String::from_utf8_lossy(&buffer[..bytes_read]);
-            println!("received: {}", response);
+            let received_data = &buffer[..bytes_read];
 
+            let output_str = if *output_format == DataFormat::HEX {
+                // Convert received data to hex if output format is hex
+                received_data.iter().map(|byte| format!("{:02x}", byte)).collect::<Vec<String>>().join(" ")
+            } else {
+                // Otherwise treat the received data as plain text
+                String::from_utf8_lossy(received_data).to_string()
+            };
+
+            println!("Received: {}", output_str);
+
+            // Optionally write the output to the file
             if let Some(ref mut writer) = output {
-                let _ = writer.write_all(response.as_bytes()); // TODO
+                if let Err(e) = writer.write_all(output_str.as_bytes()) {
+                    eprintln!("Error writing to file: {}", e);
+                }
             }
         }
-        Err(e) => eprintln!("error reading from serial port: {:?}", e),
+        Err(e) => eprintln!("Error reading from serial port: {:?}", e),
     }
 }

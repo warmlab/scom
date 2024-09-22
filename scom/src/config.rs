@@ -9,9 +9,9 @@ use serde::Deserialize;
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum DataFormat {
-    HEX = 1,
-    ASCII = 2,
-    UTF8 = 4
+    ASCII = 1,
+    UTF8 = 2,
+    HEX = 4,
 }
 
 #[allow(non_camel_case_types)]
