@@ -18,10 +18,10 @@ pub enum DataFormat {
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum BitMode {
-    /// force 7bit mode
+    /// transmits 7 data bits, useful for ASCII text but limited in terms of data range.
     bit7,
 
-    /// force 8bit mode
+    /// transmits 8 data bits, the more common mode today, allowing full byte transmission and more flexibility for binary and non-ASCII data.
     bit8,
 }
 

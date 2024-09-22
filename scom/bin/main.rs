@@ -15,6 +15,7 @@ fn main() -> Result<(), io::Error> {
     // parse command line arguments
     let cli = CommandLine::parse();
 
+    println!("{}", cli.baud.value());
     // Establish a serial connection
     let mut connection: SerialConnection = SerialConnection::new(&cli.port, cli.baud.value())?;
 
@@ -86,15 +87,21 @@ fn main() -> Result<(), io::Error> {
         //}
 
         // Handle count and loop options
-        transmissions += 1;
-        //if let Some(count_limit) = cli.count {
-            if transmissions >= cli.count {
-                break;
-            }
         //}
 
         if !cli.to_loop {
             break;
+        } else {
+            (transmissions, _) = transmissions.overflowing_add(1);
+
+            if transmissions & 0xF == 0 {
+                println!("transmission times: [{}]", transmissions);
+            }
+            if let Some(count_limit) = cli.count {
+                if transmissions >= count_limit {
+                    break;
+                }
+            }
         }
 
         //if let Some(interval_duration) = cli.interval {
@@ -131,7 +138,7 @@ fn handle_line(connection: &mut SerialConnection, line: &str, output: &mut Optio
 
     match connection.write_data(data_to_send) {
         Ok(bytes_write) => {
-            println!("data[{}] has sent to the port", bytes_write);
+            println!("> [{}]: {}", bytes_write, line);
         }
         Err(e) => eprintln!("error sending data to serial port: {:?}", e),
     }
@@ -150,7 +157,7 @@ fn handle_line(connection: &mut SerialConnection, line: &str, output: &mut Optio
                 String::from_utf8_lossy(received_data).to_string()
             };
 
-            println!("Received: {}", output_str);
+            println!("< [{}]: {}", bytes_read, output_str);
 
             // Optionally write the output to the file
             if let Some(ref mut writer) = output {

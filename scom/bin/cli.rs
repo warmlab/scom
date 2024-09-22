@@ -8,7 +8,7 @@ use scom::{BaudRate, BitMode, DataFormat};
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct CommandLine {
-    /// configuration file to use
+    /// configuration file to use (NOT IMPLEMENT!!! TODO)
     #[arg(short, long)]
     pub config: Option<PathBuf>,
 
@@ -37,8 +37,8 @@ pub struct CommandLine {
     pub output_format: DataFormat,
 
     /// specifies the number of transmissions to send before stopping.
-    #[arg(short='n', long, default_value_t=1)]
-    pub count: u32,
+    #[arg(short='n', long)]
+    pub count: Option<u32>,
 
      /// if present, the tool will continue sending data in a loop.
     #[arg(short = 'l', long="loop")]
@@ -59,6 +59,7 @@ pub struct CommandLine {
     #[arg(short, long, action = clap::ArgAction::Count)]
     pub verbose: u8,
 
+    /// data is encoded for transmission over the serial line (NOT IMPLEMENT!!! TODO)
     #[arg(short, long, value_enum, default_value_t=BitMode::bit8)]
     pub mode: BitMode
 }
