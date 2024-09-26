@@ -2,6 +2,9 @@ use std::fs::File;
 use std::path::PathBuf;
 use std::io::BufReader;
 
+use strum::IntoEnumIterator;
+use strum::EnumIter;
+
 use clap::ValueEnum;
 use toml::{self, de};
 use serde::Deserialize;
@@ -27,7 +30,7 @@ pub enum BitMode {
 
 #[allow(non_camel_case_types)]
 #[repr(u32)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Deserialize, EnumIter)]
 pub enum BaudRate {
     /// baud rate: 110
     b110 = 110,
@@ -62,6 +65,15 @@ pub enum BaudRate {
 impl BaudRate {
     pub fn value(&self) -> u32 {
         *self as u32
+    }
+
+    pub fn values() -> Vec<(String, u32)> {
+        let mut r = Vec::new();
+        for rate in BaudRate::iter() {
+            r.push((rate.value().to_string(), rate.value()));
+        }
+
+        r
     }
 }
 

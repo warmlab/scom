@@ -6,6 +6,7 @@ pub use hexstring::HexString;
 
 use serial2::SerialPort;
 use std::io::{self, Read, Write};
+use std::path::PathBuf;
 use std::time::Duration;
 
 
@@ -14,6 +15,10 @@ pub struct SerialConnection {
 }
 
 impl SerialConnection {
+    pub fn list_ports() -> std::io::Result<Vec<PathBuf>> {
+        SerialPort::available_ports()
+    }
+
     pub fn new(port_name: &str, baud_rate: u32) -> Result<Self, io::Error> {
         let mut port = SerialPort::open(port_name, baud_rate)?;
         port.set_read_timeout(Duration::from_secs(1))?;

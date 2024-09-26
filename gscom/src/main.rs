@@ -1,28 +1,31 @@
+mod menubar;
+mod panel;
+mod output_panel;
+mod port_panel;
+mod dropdown;
+
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, Button, TextView};
-use gtk::Box;
+use gtk::Application;
+use gtk::{*, prelude::*};
 
 use glib::ExitCode;
 
 use scom::SerialConnection;
 
-const APP_ID: &str = "org.gtk_rs.tool.searial";
+use crate::output_panel::OutputPanel;
+use crate::panel::PanelTrait;
+
+const APP_ID: &str = "work.arcticcircle.tool.searial";
 
 //fn build_ui(app: &Application, connection: Rc<RefCell<SerialConnection>>) {
 fn build_ui(app: &Application) {
-    
-    let connection = Rc::new(RefCell::new(SerialConnection::new("/dev/ttyS1", 9600).unwrap()));
     let window = ApplicationWindow::builder()
-                                            .application(app)
-                                            .title("Serial Communication Tool")
-                                            .build();
-    window.set_default_size(400, 300);
-
-    let text_view = TextView::new();
-    let buffer = text_view.buffer(); //.expect("Failed to get buffer");
+                                   .application(app)
+                                   .title("Serial Communication Tool")
+                                   .build();
+    window.set_default_size(800, 600);
 
     let button = Button::builder()
         .label("Send Data")
@@ -33,20 +36,35 @@ fn build_ui(app: &Application) {
         .build();
 
     button.connect_clicked(move |_| {
+        /*
         let data = b"Test data";
         let mut conn = connection.borrow_mut();
         match conn.write_data(data) {
             Ok(_) => buffer.set_text("Data sent successfully"),
             Err(e) => buffer.set_text(&format!("Failed to send data: {:?}", e)),
         }
+        */
     });
 
-    let vbox = Box::new(gtk::Orientation::Vertical, 5);
-    vbox.append(&text_view);
-    vbox.append(&button);
+    // create menu bar
+    let menubar = crate::menubar::create_menubar();
+    app.set_menubar(Some(&menubar));
 
+    let vbox = Box::new(Orientation::Vertical, 5);
+    //let output_panel = ;
+    vbox.append(&OutputPanel::build_panel());
+    //vbox.append(&hbox);
+    vbox.append(&button);
+    //window.set_child(Some(&hbox));
     window.set_child(Some(&vbox));
+    //window.shows_menubar();
+    window.set_show_menubar(true);
     window.present();
+}
+
+
+fn connect() {
+    let connection = Rc::new(RefCell::new(SerialConnection::new("/dev/ttyS1", 9600).unwrap()));
 }
 
 fn main() -> ExitCode {
