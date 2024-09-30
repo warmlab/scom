@@ -46,7 +46,7 @@ impl PanelTrait for PortPanel {
         vbox.append(&row.main_box);
 
         let hbox = Box::new(Orientation::Horizontal, 0);
-        let image = Image::from_file("assets/circle_red.svg");
+        let image = Image::from_file("assets/unplug.svg");
         let port_button = Button::builder()
             .label("Open Port")
             .margin_top(12)

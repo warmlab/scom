@@ -1,18 +1,23 @@
 mod menubar;
 mod panel;
+mod input_panel;
 mod output_panel;
 mod port_panel;
 mod dropdown;
+mod status_panel;
 
 use std::rc::Rc;
 use std::cell::RefCell;
 
+use gdk::Display;
 use gtk::Application;
 use gtk::{*, prelude::*};
 
 use glib::ExitCode;
 
+use input_panel::InputPanel;
 use scom::SerialConnection;
+use status_panel::StatusPanel;
 
 use crate::output_panel::OutputPanel;
 use crate::panel::PanelTrait;
@@ -26,6 +31,17 @@ fn build_ui(app: &Application) {
                                    .title("Serial Communication Tool")
                                    .build();
     window.set_default_size(800, 600);
+
+    let provider = CssProvider::new();
+    //provider.load_from_file("style.css");
+    provider.load_from_data(include_str!("style.css"));
+
+    // Add the provider to the default screen
+    gtk::style_context_add_provider_for_display(
+        &Display::default().expect("Could not connect to a display."),
+        &provider,
+        gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+    );
 
     let button = Button::builder()
         .label("Send Data")
@@ -53,6 +69,8 @@ fn build_ui(app: &Application) {
     let vbox = Box::new(Orientation::Vertical, 5);
     //let output_panel = ;
     vbox.append(&OutputPanel::build_panel());
+    vbox.append(&InputPanel::build_panel());
+    vbox.append(&StatusPanel::build_panel());
     //vbox.append(&hbox);
     vbox.append(&button);
     //window.set_child(Some(&hbox));
