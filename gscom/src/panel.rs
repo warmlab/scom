@@ -1,3 +1,4 @@
 pub trait PanelTrait {
-    fn build_panel() -> gtk::Widget;
+    fn new() -> Self;
+    fn build_panel(&self) -> gtk::Widget;
 }

@@ -10,7 +10,11 @@ use crate::dropdown::DropDownRow;
 pub struct PortPanel;
 
 impl PanelTrait for PortPanel {
-    fn build_panel() -> Widget {
+    fn new() -> Self {
+        PortPanel {}
+    }
+
+    fn build_panel(&self) -> Widget {
         // Device/port
         // list available serial devices/ports
         let ports = SerialConnection::list_ports();

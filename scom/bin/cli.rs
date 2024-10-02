@@ -8,6 +8,10 @@ use scom::{BaudRate, BitMode, DataFormat};
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct CommandLine {
+     /// if present, the tool will continue sending data in a loop.
+    #[arg(short = 'l', long="list")]
+    pub to_list: bool,
+
     /// configuration file to use (NOT IMPLEMENT!!! TODO)
     #[arg(short, long)]
     pub config: Option<PathBuf>,
@@ -18,7 +22,7 @@ pub struct CommandLine {
 
     /// specifies the serial port (e.g., /dev/ttyS1 or COM1), (ignore the value from config).
     #[arg(short, long)]
-    pub port: String,
+    pub port: Option<String>,
 
     /// interval: Sets an interval between transmissions in milliseconds.
     #[arg(short = 't', long, default_value_t=1000)]
@@ -41,7 +45,7 @@ pub struct CommandLine {
     pub count: Option<u32>,
 
      /// if present, the tool will continue sending data in a loop.
-    #[arg(short = 'l', long="loop")]
+    #[arg(short = 'L', long="loop")]
     pub to_loop: bool,
 
     /// specifies a file to read input data from for sending through the serial port.

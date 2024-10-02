@@ -18,3 +18,4 @@ clap = { version = "4.0", features = ["derive"] }
 serial2 = "0.2"
 strum = { version = "0.26", features = ["derive"] }
 #ncurses = "6.0"
+signal-hook = "0.3"

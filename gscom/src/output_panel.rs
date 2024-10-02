@@ -1,14 +1,14 @@
 use gtk::{prelude::*, *};
 
 use crate::panel::PanelTrait;
-use crate::port_panel::PortPanel;
+use crate::port_panel::{self, PortPanel};
 
 pub struct OutputPanel {
-    text_buffer: TextBuffer,
+    //text_buffer: TextBuffer,
 }
 
 impl OutputPanel {
-    fn build_control() -> Widget {
+    fn build_control(&self) -> Widget {
         let vbox = Box::new(Orientation::Vertical, 10);
         let button = Button::builder()
             .label("Clear")
@@ -29,7 +29,12 @@ impl OutputPanel {
 }
 
 impl PanelTrait for OutputPanel {
-    fn build_panel() -> Widget {
+    fn new() -> Self {
+        OutputPanel {}
+    }
+
+    fn build_panel(&self) -> Widget {
+        // let input = Entry::builder().placeholder_text("I will contain ones...").build();
         let text_view = TextView::builder().editable(false).cursor_visible(false).overwrite(true).hexpand(true).vexpand(true).build();
         let buffer = text_view.buffer(); //.expect("Failed to get buffer");
         let mut iter = buffer.iter_at_line(0).unwrap();
@@ -38,8 +43,9 @@ impl PanelTrait for OutputPanel {
         println!("text view iter=[{:?}], start=[{:?}], end=[{:?}]", iter, start, end);
 
         let vbox = Box::new(Orientation::Vertical, 10);
-        let port_box = PortPanel::build_panel();
-        let control_box = OutputPanel::build_control();
+        let port_panel = PortPanel::new();
+        let port_box = port_panel.build_panel();
+        let control_box = OutputPanel::build_control(self);
         vbox.append(&port_box);
         vbox.append(&control_box);
 

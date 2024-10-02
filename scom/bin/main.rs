@@ -1,24 +1,58 @@
 mod cli;
 
-use scom::{DataFormat, SerialConnection};
 use std::io::{self, BufRead, BufReader, BufWriter, Read, Write};
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use std::fs::File;
+use std::thread::{self, JoinHandle};
+use std::sync::{mpsc, Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use signal_hook::flag;
+use signal_hook::consts::SIGINT;
 
 use clap::Parser;
 
 use cli::CommandLine;
-use scom::HexString;
+use scom::{HexString, DataFormat, SerialConnection};
 
 
 fn main() -> Result<(), io::Error> {
     // parse command line arguments
     let cli = CommandLine::parse();
 
-    println!("{}", cli.baud.value());
-    // Establish a serial connection
-    let mut connection: SerialConnection = SerialConnection::new(&cli.port, cli.baud.value())?;
+    if cli.to_list {
+        let ll = SerialConnection::list_ports();
+        match ll {
+            Ok(ls) => {
+                for pb in ls {
+                    println!("{}", pb.display());
+                }
+            },
+            Err(err) => {
+                eprintln!("Error in getting available ports: {:?}", err);
+            }
+        }
 
+        return Ok(());
+    }
+
+    // Establish a serial connection
+    if cli.port == None {
+        eprintln!("Usage: {} --port <PORT>", env!("CARGO_PKG_NAME"));
+        return Err(io::Error::new(io::ErrorKind::AddrNotAvailable, "do not supply the serial port"));
+    }
+
+    // Establish a serial connection
+    let mut conn: SerialConnection = SerialConnection::new(&cli.port.expect("Port is required!"), cli.baud.value())?;
+    let mut connection = Arc::new(Mutex::new(conn));
+    // Create a shutdown flag
+    let shutdown_flag = Arc::new(AtomicBool::new(false));
+    // Set up the signal handler for Ctrl+C
+    flag::register(SIGINT, shutdown_flag.clone()).expect("Error setting signal handler");
+
+    // start read thread
+    let handler = read_thread(connection.clone(), &cli.output, &cli.output_format, shutdown_flag.clone());
     let mut lines: Vec<String> = Vec::new();
 
     // process data which would send
@@ -26,17 +60,6 @@ fn main() -> Result<(), io::Error> {
         for line in lns.lines() {
             lines.push(line.to_string());
         }
-    };
-
-    // output file, result usually write to this
-    let mut output = if let Some(output_path) = cli.output {
-        // Some(File::create(output_path)?)
-        match File::create(output_path) {
-            Ok(file) => Some(BufWriter::new(file)),
-            Err(_) => None
-        }
-    } else {
-        None
     };
 
     if let Some(input_path) = cli.input {
@@ -56,19 +79,19 @@ fn main() -> Result<(), io::Error> {
     let mut transmissions: u32 = 0;
     //let mut input_lines: Vec<String> = Vec::new();
 
-
-    loop {
+    while !shutdown_flag.load(Ordering::Relaxed) {
         // Input handling
         if lines.is_empty() {
             print!("Enter data to send: ");
             io::stdout().flush()?;
             let mut input = String::new();
             io::stdin().read_line(&mut input)?;
+            let input = input.trim();
             //input_lines.push(input);
-            handle_line(&mut connection, &input, &mut output, &cli.input_format, &cli.output_format);
+            handle_line(connection.clone(), &input, &cli.input_format);
         } else {
             for line in lines.iter() {
-                handle_line(&mut connection, &line, &mut output, &cli.input_format, &cli.output_format);
+                handle_line(connection.clone(), &line, &cli.input_format);
             }
         }
 
@@ -90,6 +113,8 @@ fn main() -> Result<(), io::Error> {
         //}
 
         if !cli.to_loop {
+            // Signal the read thread to stop
+            shutdown_flag.store(true, Ordering::Relaxed);
             break;
         } else {
             (transmissions, _) = transmissions.overflowing_add(1);
@@ -110,14 +135,83 @@ fn main() -> Result<(), io::Error> {
         // Reset input for next loop if looping
         //input_lines.clear();
 
+        if shutdown_flag.load(Ordering::Relaxed) {
+            // Signal the read thread to stop
+            shutdown_flag.store(true, Ordering::Relaxed);
+        }
         // Handle interval between transmissions
-        std::thread::sleep(Duration::from_millis(cli.interval as u64));
+        thread::sleep(Duration::from_millis(cli.interval as u64));
     }
+
+    handler.join().unwrap();
 
     Ok(())
 }
 
-fn handle_line(connection: &mut SerialConnection, line: &str, output: &mut Option<BufWriter<File>>, input_format: &DataFormat, output_format: &DataFormat) {
+fn read_thread(connection: Arc<Mutex<SerialConnection>>,
+               output_path: &Option<PathBuf>,
+               output_format: &DataFormat,
+               shutdown_flag: Arc<AtomicBool>, // Flag for stopping the thread
+    ) -> JoinHandle<()> {
+    let fm = output_format.clone();
+
+    // output file, result usually write to this
+    let mut output = if let Some(output_path) = output_path {
+        // Some(File::create(output_path)?)
+        match File::create(output_path) {
+            Ok(file) => Some(BufWriter::new(file)),
+            Err(_) => None
+        }
+    } else {
+        None
+    };
+
+    let handler = thread::spawn(move || {
+        // Buffer for receiving data from the serial connection
+        let mut buffer = [0; 1024];
+        // Loop until the shutdown_flag is set to true
+        while !shutdown_flag.load(Ordering::Relaxed) {
+            let mut conn = connection.lock().unwrap();
+            match conn.read_data(&mut buffer) {
+                Ok(bytes_read) => {
+                    let received_data = &buffer[..bytes_read];
+
+                    let output_str = if fm == DataFormat::HEX {
+                        // Convert received data to hex if output format is hex
+                        received_data.iter().map(|byte| format!("{:02x}", byte)).collect::<Vec<String>>().join(" ")
+                    } else {
+                        // Otherwise treat the received data as plain text
+                        String::from_utf8_lossy(received_data).to_string()
+                    };
+
+
+                    // Optionally write the output to the file
+                    if let Some(ref mut writer) = output {
+                        if let Err(e) = writer.write_all(output_str.as_bytes()) {
+                            eprintln!("Error writing to file: {}", e);
+                        }
+                        writer.flush();
+                    } else {
+                        println!("< [{}]: {}", bytes_read, output_str);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error reading from serial port: {:?}", e);
+                    break;
+                }
+            }
+
+            // Sleep for a small amount of time to avoid busy looping
+            thread::sleep(Duration::from_millis(50));
+        }
+
+        //println!("Read thread shutting down gracefully.");
+    });
+
+    handler
+}
+
+fn handle_line(connection: Arc<Mutex<SerialConnection>>, line: &str, input_format: &DataFormat) {
     let hex;
     let data_to_send;
     // send data
@@ -136,36 +230,12 @@ fn handle_line(connection: &mut SerialConnection, line: &str, output: &mut Optio
         data_to_send = line.as_bytes();
     }
 
-    match connection.write_data(data_to_send) {
+    match connection.lock().unwrap().write_data(data_to_send) {
         Ok(bytes_write) => {
-            println!("> [{}]: {}", bytes_write, line);
-        }
-        Err(e) => eprintln!("error sending data to serial port: {:?}", e),
-    }
-
-    // Buffer for receiving data from the serial connection
-    let mut buffer = [0; 1024];
-    match connection.read_data(&mut buffer) {
-        Ok(bytes_read) => {
-            let received_data = &buffer[..bytes_read];
-
-            let output_str = if *output_format == DataFormat::HEX {
-                // Convert received data to hex if output format is hex
-                received_data.iter().map(|byte| format!("{:02x}", byte)).collect::<Vec<String>>().join(" ")
-            } else {
-                // Otherwise treat the received data as plain text
-                String::from_utf8_lossy(received_data).to_string()
-            };
-
-            println!("< [{}]: {}", bytes_read, output_str);
-
-            // Optionally write the output to the file
-            if let Some(ref mut writer) = output {
-                if let Err(e) = writer.write_all(output_str.as_bytes()) {
-                    eprintln!("Error writing to file: {}", e);
-                }
+            if bytes_write > 0 {
+                println!("> [{}]: {}", bytes_write, line);
             }
         }
-        Err(e) => eprintln!("Error reading from serial port: {:?}", e),
+        Err(e) => eprintln!("Error sending data to serial port: {:?}", e),
     }
 }

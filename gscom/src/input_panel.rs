@@ -25,7 +25,11 @@ impl InputPanel {
 }
 
 impl PanelTrait for InputPanel {
-    fn build_panel() -> Widget {
+    fn new() -> Self {
+        InputPanel {}
+    }
+
+    fn build_panel(&self) -> Widget {
         let text_view = TextView::builder().editable(true).cursor_visible(true).overwrite(false).hexpand(true).vexpand(true).build();
         let buffer = text_view.buffer(); //.expect("Failed to get buffer");
         let mut iter = buffer.iter_at_line(0).unwrap();
