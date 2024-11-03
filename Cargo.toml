@@ -2,4 +2,4 @@
 members = [
     "scom",
     "gscom"
-]
+, "cscom"]

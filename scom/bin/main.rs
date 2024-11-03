@@ -14,7 +14,7 @@ use signal_hook::consts::SIGINT;
 use clap::Parser;
 
 use cli::CommandLine;
-use scom::{HexString, DataFormat, SerialConnection};
+use scom::{HexString, data_format::DataFormat, SerialConnection};
 
 
 fn main() -> Result<(), io::Error> {
@@ -37,14 +37,15 @@ fn main() -> Result<(), io::Error> {
         return Ok(());
     }
 
+    let config = cli.to_config();
     // Establish a serial connection
-    if cli.port == None {
+    if config.port.port == None {
         eprintln!("Usage: {} --port <PORT>", env!("CARGO_PKG_NAME"));
         return Err(io::Error::new(io::ErrorKind::AddrNotAvailable, "do not supply the serial port"));
     }
 
     // Establish a serial connection
-    let mut conn: SerialConnection = SerialConnection::new(&cli.port.expect("Port is required!"), cli.baud.value())?;
+    let mut conn: SerialConnection = SerialConnection::new(&config.port.port.expect("Port is required!"), config.port.baud.expect("No value").value())?; // TODO, need a default value for the baud rate
     let mut connection = Arc::new(Mutex::new(conn));
     // Create a shutdown flag
     let shutdown_flag = Arc::new(AtomicBool::new(false));
@@ -52,7 +53,7 @@ fn main() -> Result<(), io::Error> {
     flag::register(SIGINT, shutdown_flag.clone()).expect("Error setting signal handler");
 
     // start read thread
-    let handler = read_thread(connection.clone(), &cli.output, &cli.output_format, shutdown_flag.clone());
+    let handler = read_thread(connection.clone(), &cli.output, &config.dataformat.output, shutdown_flag.clone());
     let mut lines: Vec<String> = Vec::new();
 
     // process data which would send
@@ -76,7 +77,7 @@ fn main() -> Result<(), io::Error> {
     };
 
     // Run loop for sending/receiving data
-    let mut transmissions: u32 = 0;
+    let mut transmissions: usize = 0;
     //let mut input_lines: Vec<String> = Vec::new();
 
     while !shutdown_flag.load(Ordering::Relaxed) {
@@ -88,10 +89,10 @@ fn main() -> Result<(), io::Error> {
             io::stdin().read_line(&mut input)?;
             let input = input.trim();
             //input_lines.push(input);
-            handle_line(connection.clone(), &input, &cli.input_format);
+            handle_line(connection.clone(), &input, &config.dataformat.input);
         } else {
             for line in lines.iter() {
-                handle_line(connection.clone(), &line, &cli.input_format);
+                handle_line(connection.clone(), &line, &config.dataformat.input);
             }
         }
 
@@ -112,7 +113,7 @@ fn main() -> Result<(), io::Error> {
         // Handle count and loop options
         //}
 
-        if !cli.to_loop {
+        if config.loops.to_loop != None && !config.loops.to_loop.expect("msg") {
             // Signal the read thread to stop
             shutdown_flag.store(true, Ordering::Relaxed);
             break;
@@ -122,14 +123,14 @@ fn main() -> Result<(), io::Error> {
             if transmissions & 0xF == 0 {
                 println!("transmission times: [{}]", transmissions);
             }
-            if let Some(count_limit) = cli.count {
+            if let Some(count_limit) = config.loops.count {
                 if transmissions >= count_limit {
                     break;
                 }
             }
         }
 
-        //if let Some(interval_duration) = cli.interval {
+        //if let Some(interval_duration) = config.interval {
         //}
 
         // Reset input for next loop if looping
@@ -140,7 +141,7 @@ fn main() -> Result<(), io::Error> {
             shutdown_flag.store(true, Ordering::Relaxed);
         }
         // Handle interval between transmissions
-        thread::sleep(Duration::from_millis(cli.interval as u64));
+        thread::sleep(Duration::from_millis(config.loops.interval.expect("")));
     }
 
     handler.join().unwrap();
@@ -150,10 +151,9 @@ fn main() -> Result<(), io::Error> {
 
 fn read_thread(connection: Arc<Mutex<SerialConnection>>,
                output_path: &Option<PathBuf>,
-               output_format: &DataFormat,
+               output_format: &Option<DataFormat>,
                shutdown_flag: Arc<AtomicBool>, // Flag for stopping the thread
     ) -> JoinHandle<()> {
-    let fm = output_format.clone();
 
     // output file, result usually write to this
     let mut output = if let Some(output_path) = output_path {
@@ -166,6 +166,7 @@ fn read_thread(connection: Arc<Mutex<SerialConnection>>,
         None
     };
 
+    let fm = output_format.clone();
     let handler = thread::spawn(move || {
         // Buffer for receiving data from the serial connection
         let mut buffer = [0; 1024];
@@ -176,21 +177,23 @@ fn read_thread(connection: Arc<Mutex<SerialConnection>>,
                 Ok(bytes_read) => {
                     let received_data = &buffer[..bytes_read];
 
-                    let output_str = if fm == DataFormat::HEX {
-                        // Convert received data to hex if output format is hex
-                        received_data.iter().map(|byte| format!("{:02x}", byte)).collect::<Vec<String>>().join(" ")
-                    } else {
-                        // Otherwise treat the received data as plain text
-                        String::from_utf8_lossy(received_data).to_string()
+                    let output_str = match fm {
+                        Some(DataFormat::HEX) => {
+                            // Convert received data to hex if output format is hex
+                            received_data.iter().map(|byte| format!("{:02x}", byte)).collect::<Vec<String>>().join(" ")
+                        },
+                        _ => {
+                            // Otherwise treat the received data as plain text
+                            String::from_utf8_lossy(received_data).to_string()
+                        }
                     };
-
 
                     // Optionally write the output to the file
                     if let Some(ref mut writer) = output {
                         if let Err(e) = writer.write_all(output_str.as_bytes()) {
                             eprintln!("Error writing to file: {}", e);
                         }
-                        writer.flush();
+                        let _ = writer.flush(); // TODO
                     } else {
                         println!("< [{}]: {}", bytes_read, output_str);
                     }
@@ -211,23 +214,27 @@ fn read_thread(connection: Arc<Mutex<SerialConnection>>,
     handler
 }
 
-fn handle_line(connection: Arc<Mutex<SerialConnection>>, line: &str, input_format: &DataFormat) {
+fn handle_line(connection: Arc<Mutex<SerialConnection>>, line: &str, input_format: &Option<DataFormat>) {
     let hex;
     let data_to_send;
     // send data
-    if *input_format == DataFormat::HEX {
-        data_to_send = match String::from_hex(line) {
-            Ok(r) => {
-                hex = r;
-                hex.as_slice()
-            },
-            Err(err) => {
-                eprintln!("error in parse vector bytes to array: {}", err);
-                b""
-            }
-        };
-    } else {
-        data_to_send = line.as_bytes();
+    match input_format {
+        //if *input_format == DataFormat::HEX {
+        Some(DataFormat::HEX) => {
+            data_to_send = match String::from_hex(line) {
+                Ok(r) => {
+                    hex = r;
+                    hex.as_slice()
+                },
+                Err(err) => {
+                    eprintln!("error in parse vector bytes to array: {}", err);
+                    b""
+                }
+            };
+        },
+        _ => {
+            data_to_send = line.as_bytes();
+        }
     }
 
     match connection.lock().unwrap().write_data(data_to_send) {

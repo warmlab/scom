@@ -1,110 +1,135 @@
+use std::collections::HashMap;
 use std::fs::File;
+use std::io::Read;
 use std::path::PathBuf;
-use std::io::BufReader;
 
-use strum::IntoEnumIterator;
-use strum::EnumIter;
-
-use clap::ValueEnum;
-use toml::{self, de};
+//use strum::IntoEnumIterator;
+//use strum::EnumIter;
+//
+//use clap::ValueEnum;
 use serde::Deserialize;
+use toml;
 
-#[repr(u8)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
-pub enum DataFormat {
-    ASCII = 1,
-    UTF8 = 2,
-    HEX = 4,
+use crate::baud_rate::BaudRate;
+use crate::data_bit::BitMode;
+use crate::parity::Parity;
+use crate::stop_bit::StopBit;
+use crate::handshake::Handshake;
+use crate::data_format::DataFormat;
+
+#[derive(Debug, Deserialize)]
+pub struct PortConfig {
+    pub port: Option<String>,
+    pub baud: Option<BaudRate>,
+    pub data_bits: Option<BitMode>,
+    pub parity: Option<Parity>,
+    pub stop_bits: Option<StopBit>,
+    pub handshake: Option<Handshake>,
+
+    #[serde(flatten)]
+    pub extra: HashMap<String, toml::Value>, // Capture unexpected fields
 }
 
-#[allow(non_camel_case_types)]
-#[repr(u8)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
-pub enum BitMode {
-    /// transmits 7 data bits, useful for ASCII text but limited in terms of data range.
-    bit7,
+#[derive(Debug, Deserialize)]
+pub struct LoopsConfig {
+    pub to_loop: Option<bool>,
+    pub interval: Option<u64>,
+    pub count: Option<usize>,
+    pub timeout: Option<u64>,
 
-    /// transmits 8 data bits, the more common mode today, allowing full byte transmission and more flexibility for binary and non-ASCII data.
-    bit8,
+    #[serde(flatten)]
+    pub extra: HashMap<String, toml::Value>, // Capture unexpected fields
 }
 
-#[allow(non_camel_case_types)]
-#[repr(u32)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Deserialize, EnumIter)]
-pub enum BaudRate {
-    /// baud rate: 110
-    b110 = 110,
-    /// baud rate: 300
-    b300 = 300,
-    /// baud rate: 600
-    b600 = 600,
-    /// baud rate: 1200
-    b1200 = 1200,
-    /// baud rate: 2400
-    b2400 = 2400,
-    /// baud rate: 4800
-    b4800 = 4800,
-    /// baud rate: 9600
-    b9600 = 9600,
-    /// baud rate: 14400
-    b14400 = 14400,
-    /// baud rate: 19200
-    b19200 = 19200,
-    /// baud rate: 38400
-    b38400 = 38400,
-    /// baud rate: 57600
-    b57600 = 57600,
-    /// baud rate: 115200
-    b115200 = 115200,
-    /// baud rate: 128000
-    b128000 = 128000,
-    /// baud rate: 256000
-    b256000 = 256000,
+#[derive(Debug, Deserialize)]
+pub struct DataFormatConfig {
+    pub input: Option<DataFormat>,
+    pub output: Option<DataFormat>,
+
+    #[serde(flatten)]
+    pub extra: HashMap<String, toml::Value>, // Capture unexpected fields
 }
 
-impl BaudRate {
-    pub fn value(&self) -> u32 {
-        *self as u32
-    }
-
-    pub fn values() -> Vec<(String, u32)> {
-        let mut r = Vec::new();
-        for rate in BaudRate::iter() {
-            r.push((rate.value().to_string(), rate.value()));
-        }
-
-        r
-    }
-}
-
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct Config {
-    port: String,
-    baud_rate: BaudRate,
+    /*pub port: String,
+    pub baud: BaudRate,
+    pub data_bits: BitMode,
+    pub parity: Parity,
+    pub stop_bits: StopBit,
+    pub handshake: Handshake,
+    pub interval: u64,
+    pub timeout: u64,
+    pub input_format: DataFormat,
+    pub output_format: DataFormat,
+    pub count: usize,
+    */
+    pub port: PortConfig,
+    pub loops: LoopsConfig,
+    pub dataformat: DataFormatConfig,
+
+    #[serde(flatten)]
+    pub extra_sections: HashMap<String, toml::Value>, // Capture unexpected sections
 }
 
 impl Config {
     pub fn new() -> Self {
         Config {
-            port: "".to_string(),
-            baud_rate: BaudRate::b115200
+            port: PortConfig {
+                port: Some("/dev/ttyUSB0".to_string()),
+                baud: Some(BaudRate::b115200),
+                data_bits: Some(BitMode::Bit8),
+                parity: Some(Parity::None),
+                stop_bits: Some(StopBit::None),
+                handshake: Some(Handshake::None),
+                extra: HashMap::new(),
+
+            },
+            loops: LoopsConfig {
+                to_loop: Some(false),
+                interval: Some(1000), // unit millisecond
+                timeout: Some(1000), // unit second TODO 
+                count: Some(0),
+                extra: HashMap::new(),
+            },
+
+            dataformat: DataFormatConfig {
+                input: Some(DataFormat::ASCII),
+                output: Some(DataFormat::ASCII),
+                extra: HashMap::new()
+            },
+
+            extra_sections: HashMap::new()
         }
     }
 
-    pub fn load(filename: &Option<PathBuf>) -> Option<Self> {
+    pub fn load(config_file: &PathBuf) -> Option<Config> {
         // read configure file
-        if let Some(config_file) = filename {
-            let file = File::open(config_file).expect("configure file was not found");
+        //if let Some(config_file) = filename {
+            let mut file = File::open(config_file).expect("configure file was not found");
+            let mut content: String = String::new();
             //let mut buf = Vec::new();
-            let reader = BufReader::new(file);
+            //let reader = BufReader::new(file);
             //let _size = reader.buffer(); //.read_to_ing(&mut buf);
-            let config: Result<Config, de::Error> = toml::from_slice(reader.buffer());
-            match config {
-                Ok(c) => Some(c),
+            return match file.read_to_string(&mut content) {
+                Ok(_) => {
+                    //let config: Result<HashMap<String, String>, toml::de::Error> = toml::from_str(&content);
+                    let config: Result<Config, toml::de::Error> = toml::from_str(&content);
+                    match config {
+                        Ok(c) => {
+                            println!("{:?}", c);
+                            Some(Config::new())
+                        },
+                        Err(err) => {
+                            println!("error loading config file: {}", err);
+                            None
+                        }
+                    }
+                },
                 Err(_) => None
             };
-        }
+        //}
 
-        None
+        //None
     }
 }

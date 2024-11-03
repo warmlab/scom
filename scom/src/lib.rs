@@ -1,13 +1,27 @@
-mod config;
-mod hexstring;
+pub mod config;
+pub mod hexstring;
+pub mod baud_rate;
+pub mod data_bit;
+pub mod parity;
+pub mod stop_bit;
+pub mod handshake;
+pub mod data_format;
 
-pub use config::{Config, BitMode, BaudRate, DataFormat};
+pub use config::Config;
 pub use hexstring::HexString;
 
 use serial2::SerialPort;
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
 use std::time::Duration;
+
+//extern crate libc;
+
+use std::ffi::CString;
+use std::os::raw::c_char;
+use std::ptr;
+use std::fs;
+//use std::io::{self, Write};
 
 
 pub struct SerialConnection {
