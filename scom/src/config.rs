@@ -11,9 +11,9 @@ use serde::Deserialize;
 use toml;
 
 use crate::baud_rate::BaudRate;
-use crate::data_bit::BitMode;
+use crate::data_bits::BitMode;
 use crate::parity::Parity;
-use crate::stop_bit::StopBit;
+use crate::stop_bits::StopBits;
 use crate::handshake::Handshake;
 use crate::data_format::DataFormat;
 
@@ -23,7 +23,7 @@ pub struct PortConfig {
     pub baud: Option<BaudRate>,
     pub data_bits: Option<BitMode>,
     pub parity: Option<Parity>,
-    pub stop_bits: Option<StopBit>,
+    pub stop_bits: Option<StopBits>,
     pub handshake: Option<Handshake>,
 
     #[serde(flatten)]
@@ -80,7 +80,7 @@ impl Config {
                 baud: Some(BaudRate::b115200),
                 data_bits: Some(BitMode::Bit8),
                 parity: Some(Parity::None),
-                stop_bits: Some(StopBit::None),
+                stop_bits: Some(StopBits::None),
                 handshake: Some(Handshake::None),
                 extra: HashMap::new(),
 

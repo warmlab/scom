@@ -14,6 +14,19 @@ pub enum Parity {
     Space = 4
 }
 
+impl Parity {
+    pub fn as_serial_value(&self) -> serial2::Parity {
+        match self { // TODO
+            //Parity::None => serial2::Parity::None,
+            Parity::Odd => serial2::Parity::Odd,
+            Parity::Even => serial2::Parity::Even,
+            //Parity::Mark => serial2::Parity::Mark,
+            //Parity::Space => serial2::Parity::Space,
+            _ => serial2::Parity::None, // Default to Even if not specified in the configuration file
+        }
+    }
+}
+
 impl Default for Parity {
     fn default() -> Self {
         Parity::None

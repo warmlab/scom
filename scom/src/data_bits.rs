@@ -13,6 +13,15 @@ pub enum BitMode {
     Bit8,
 }
 
+impl BitMode {
+    pub fn as_serial_value(&self) -> serial2::CharSize {
+        match self {
+            BitMode::Bit7 => serial2::CharSize::Bits7,
+            BitMode::Bit8 => serial2::CharSize::Bits8,
+        }
+    }
+}
+
 impl Default for BitMode {
     fn default() -> Self {
         BitMode::Bit8

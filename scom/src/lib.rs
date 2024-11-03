@@ -1,16 +1,20 @@
 pub mod config;
 pub mod hexstring;
 pub mod baud_rate;
-pub mod data_bit;
+pub mod data_bits;
 pub mod parity;
-pub mod stop_bit;
+pub mod stop_bits;
 pub mod handshake;
 pub mod data_format;
 
 pub use config::Config;
+use data_bits::BitMode;
+use handshake::Handshake;
 pub use hexstring::HexString;
 
-use serial2::SerialPort;
+use parity::Parity;
+use serial2::{SerialPort, Settings};
+use stop_bits::StopBits;
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -23,6 +27,9 @@ use std::ptr;
 use std::fs;
 //use std::io::{self, Write};
 
+trait SerialPortSettings {
+    fn as_serial_value<T>(&self) -> T;
+}
 
 pub struct SerialConnection {
     port: SerialPort,
@@ -33,8 +40,17 @@ impl SerialConnection {
         SerialPort::available_ports()
     }
 
-    pub fn new(port_name: &str, baud_rate: u32) -> Result<Self, io::Error> {
-        let mut port = SerialPort::open(port_name, baud_rate)?;
+    pub fn new(port_name: &str, baud_rate: u32, data_bit: BitMode, stop_bit: StopBits, parity: Parity, handshake: Handshake) -> Result<Self, io::Error> {
+
+        let mut port = SerialPort::open(port_name, |mut settings: Settings | {
+            settings.set_raw();
+            settings.set_baud_rate(baud_rate)?;
+            settings.set_char_size(BitMode::Bit8.as_serial_value());
+            settings.set_stop_bits(StopBits::None.as_serial_value());
+            settings.set_parity(Parity::None.as_serial_value());
+            //settings.set_flow_control(FlowControl::RtsCts);
+            Ok(settings)
+        })?;
         port.set_read_timeout(Duration::from_secs(1))?;
         port.set_write_timeout(Duration::from_secs(1))?;
         Ok(SerialConnection { port })

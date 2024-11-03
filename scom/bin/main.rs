@@ -8,6 +8,7 @@ use std::thread::{self, JoinHandle};
 use std::sync::{mpsc, Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use scom::data_bits;
 use signal_hook::flag;
 use signal_hook::consts::SIGINT;
 
@@ -45,7 +46,13 @@ fn main() -> Result<(), io::Error> {
     }
 
     // Establish a serial connection
-    let mut conn: SerialConnection = SerialConnection::new(&config.port.port.expect("Port is required!"), config.port.baud.expect("No value").value())?; // TODO, need a default value for the baud rate
+    let mut conn: SerialConnection = SerialConnection::new(&config.port.port.expect("Port is required!"),
+                                                            config.port.baud.expect("No value").value(),
+                                                            config.port.data_bits.expect("No value"),
+                                                            config.port.stop_bits.expect("No value"),
+                                                            config.port.parity.expect("No value"),
+                                                            config.port.handshake.expect("No value")
+                                                        )?; // TODO, need a default value for the baud rate
     let mut connection = Arc::new(Mutex::new(conn));
     // Create a shutdown flag
     let shutdown_flag = Arc::new(AtomicBool::new(false));

@@ -8,10 +8,10 @@ use std::{path::PathBuf, time::Duration};
 
 use scom::{baud_rate::BaudRate, data_format::DataFormat};
 
-use scom::stop_bit::StopBit;
+use scom::stop_bits::StopBits;
 use scom::parity::Parity;
 use scom::handshake::Handshake;
-use scom::data_bit::BitMode;
+use scom::data_bits::BitMode;
 use scom::config::Config;
 
 const DEFAULT_CONFIG_NAME: &str = ".scom.config";
@@ -45,7 +45,7 @@ pub struct CommandLine {
 
     /// specifies the stop bit for the serial communication.
     #[arg(short, long, value_enum)]
-    pub stop_bits: Option<StopBit>,
+    pub stop_bits: Option<StopBits>,
 
     /// specifies the handshake for the serial communication.
     #[arg(short = 'H', long, value_enum)]
