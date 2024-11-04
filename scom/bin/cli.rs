@@ -10,7 +10,7 @@ use scom::{baud_rate::BaudRate, data_format::DataFormat};
 
 use scom::stop_bits::StopBits;
 use scom::parity::Parity;
-use scom::handshake::Handshake;
+use scom::flow_control::FlowControl;
 use scom::data_bits::BitMode;
 use scom::config::Config;
 
@@ -44,12 +44,12 @@ pub struct CommandLine {
     pub data_bits: Option<BitMode>,
 
     /// specifies the stop bit for the serial communication.
-    #[arg(short, long, value_enum)]
+    #[arg(short = 'S', long, value_enum)]
     pub stop_bits: Option<StopBits>,
 
-    /// specifies the handshake for the serial communication.
-    #[arg(short = 'H', long, value_enum)]
-    pub handshake: Option<Handshake>,
+    /// specifies the flow control for the serial communication.
+    #[arg(short = 'F', long, value_enum)]
+    pub flow_control: Option<FlowControl>,
 
     /// interval: Sets an interval between transmissions in milliseconds.
     #[arg(short = 't', long)]
@@ -110,42 +110,39 @@ impl CommandLine {
         if self.config == None {
             let path = match env::current_dir() {
                 Ok(p) => {
-                    eprintln!("Failed to load configuration file: {}/{}", p.display(), DEFAULT_CONFIG_NAME);
-                    p.join(DEFAULT_CONFIG_NAME)
+                    let tmp = p.join(DEFAULT_CONFIG_NAME);
+                    if tmp.is_file() {
+                        println!("Using configuration file at current directory");
+                        tmp
+                    } else {
+                        //eprintln!("Failed to get current directory");
+                        match dirs::home_dir() {
+                            Some(p) => {
+                                let tmp = p.join(DEFAULT_CONFIG_NAME);
+                                if tmp.is_file() {
+                                    println!("Using configuration file at current directory");
+                                    tmp
+                                } else {
+                                    //eprintln!("Failed to get home directory");
+                                    PathBuf::new()
+                                }
+                            },
+                            None => {
+                                //eprintln!("Failed to get home directory");
+                                PathBuf::new()
+                            }
+                        }
+                    }
                 },
                 Err(_) => {
-                    eprintln!("Failed to get current directory");
+                    //eprintln!("Failed to load configuration file: {}/{}", p.display(), DEFAULT_CONFIG_NAME);
                     PathBuf::new()
                 }
             };
             let option_config: Option<Config> = Config::load(&path);
             config = match option_config {
                 Some(c) => c,
-                None => {
-                    let path = env::var_os("HOME");
-                    let path = match path {
-                        Some(path) => {
-                            let mut pathbuf = PathBuf::new();
-                            pathbuf.push(path);
-                            let path = pathbuf.join(DEFAULT_CONFIG_NAME);
-                            //let path = PathBuf::new(path.into_string()).join(DEFAULT_CONFIG_NAME);
-                            println!("Home Directory: {:?}", path);
-                            path
-                        },
-                        None => {
-                            eprintln!("Failed to get home directory");
-                            PathBuf::new()
-                        }
-                    };
-                    let option_config = Config::load(&path);
-                    match option_config {
-                        Some(c) => c,
-                        None => {
-                            //eprintln!("Failed to load configuration file: {}", path.display());
-                            Config::new()
-                        }
-                    }
-                }
+                None => Config::new()
             };
         } else {
             if let Some(path) = &self.config {
@@ -183,8 +180,8 @@ impl CommandLine {
             config.port.parity = self.parity;
         }
 
-        if let Some(_) = self.handshake {
-            config.port.handshake = self.handshake;
+        if let Some(_) = self.flow_control {
+            config.port.flow_control = self.flow_control;
         }
 
         if let Some(_) = self.to_loop {

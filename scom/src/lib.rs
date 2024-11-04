@@ -4,12 +4,13 @@ pub mod baud_rate;
 pub mod data_bits;
 pub mod parity;
 pub mod stop_bits;
-pub mod handshake;
+//pub mod handshake;
+pub mod flow_control;
 pub mod data_format;
 
 pub use config::Config;
 use data_bits::BitMode;
-use handshake::Handshake;
+use flow_control::FlowControl;
 pub use hexstring::HexString;
 
 use parity::Parity;
@@ -40,15 +41,15 @@ impl SerialConnection {
         SerialPort::available_ports()
     }
 
-    pub fn new(port_name: &str, baud_rate: u32, data_bit: BitMode, stop_bit: StopBits, parity: Parity, handshake: Handshake) -> Result<Self, io::Error> {
+    pub fn new(port_name: &str, baud_rate: u32, data_bit: BitMode, stop_bit: StopBits, parity: Parity, flow_control: FlowControl) -> Result<Self, io::Error> {
 
         let mut port = SerialPort::open(port_name, |mut settings: Settings | {
             settings.set_raw();
             settings.set_baud_rate(baud_rate)?;
-            settings.set_char_size(BitMode::Bit8.as_serial_value());
-            settings.set_stop_bits(StopBits::None.as_serial_value());
-            settings.set_parity(Parity::None.as_serial_value());
-            //settings.set_flow_control(FlowControl::RtsCts);
+            settings.set_char_size(data_bit.as_serial_value());
+            settings.set_stop_bits(stop_bit.as_serial_value());
+            settings.set_parity(parity.as_serial_value());
+            settings.set_flow_control(flow_control.as_serial_value());
             Ok(settings)
         })?;
         port.set_read_timeout(Duration::from_secs(1))?;

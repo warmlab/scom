@@ -14,7 +14,8 @@ use crate::baud_rate::BaudRate;
 use crate::data_bits::BitMode;
 use crate::parity::Parity;
 use crate::stop_bits::StopBits;
-use crate::handshake::Handshake;
+//use crate::handshake::Handshake;
+use crate::flow_control::FlowControl;
 use crate::data_format::DataFormat;
 
 #[derive(Debug, Deserialize)]
@@ -24,7 +25,8 @@ pub struct PortConfig {
     pub data_bits: Option<BitMode>,
     pub parity: Option<Parity>,
     pub stop_bits: Option<StopBits>,
-    pub handshake: Option<Handshake>,
+    //pub handshake: Option<Handshake>,
+    pub flow_control: Option<FlowControl>,
 
     #[serde(flatten)]
     pub extra: HashMap<String, toml::Value>, // Capture unexpected fields
@@ -81,7 +83,7 @@ impl Config {
                 data_bits: Some(BitMode::Bit8),
                 parity: Some(Parity::None),
                 stop_bits: Some(StopBits::None),
-                handshake: Some(Handshake::None),
+                flow_control: Some(FlowControl::None),
                 extra: HashMap::new(),
 
             },
@@ -104,6 +106,9 @@ impl Config {
     }
 
     pub fn load(config_file: &PathBuf) -> Option<Config> {
+        if !config_file.is_file() {
+            return None;
+        }
         // read configure file
         //if let Some(config_file) = filename {
             let mut file = File::open(config_file).expect("configure file was not found");

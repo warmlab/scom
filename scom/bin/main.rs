@@ -47,11 +47,11 @@ fn main() -> Result<(), io::Error> {
 
     // Establish a serial connection
     let mut conn: SerialConnection = SerialConnection::new(&config.port.port.expect("Port is required!"),
-                                                            config.port.baud.expect("No value").value(),
-                                                            config.port.data_bits.expect("No value"),
-                                                            config.port.stop_bits.expect("No value"),
-                                                            config.port.parity.expect("No value"),
-                                                            config.port.handshake.expect("No value")
+                                                            config.port.baud.expect("Baud rate is required!").value(),
+                                                            config.port.data_bits.expect("Data Bits is required!"),
+                                                            config.port.stop_bits.expect("Stop bits is required!"),
+                                                            config.port.parity.expect("Parity is required!"),
+                                                            config.port.flow_control.expect("Handshake is required!")
                                                         )?; // TODO, need a default value for the baud rate
     let mut connection = Arc::new(Mutex::new(conn));
     // Create a shutdown flag
